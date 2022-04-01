@@ -1,34 +1,8 @@
 name: 'Update Obmondo Kubernetes'
 description: 'Create a PR in a GitOps repo with the newest release of Obmondo Kubernetes'
-inputs:
-  destination_repo:
-    description: 'Destination repository'
-    required: true
-  destination_target_branch:
-    description: 'Source repo target branch. Usually `master` or `main`.'
-    required: false
-  git_user_name:
-    description: 'GitHub username to use for the commit'
-    required: false
-  git_user_email:
-    description: 'GitHub email to use for the commit'
-    required: false
-  deploy_target_branch:
-    description: 'Target branch'
-    required: false
-    default: 'main'
-  pull_request_reviewers:
-    description: 'Pull request reviewer. Should be a comma-separated list of GitHub usernames.'
-    required: false
 runs:
   using: 'docker'
   image: 'Dockerfile'
-  args:
-    - ${{ inputs.destination-repo }}
-    - ${{ inputs.destination-target-branch }}
-    - ${{ inputs.git-user-email }}
-    - ${{ inputs.git-user-name }}
-    - ${{ inputs.pull-request-reviewers }}
 branding:
   icon: 'git-pull-request'
   color: 'blue'

@@ -7,34 +7,38 @@ if ! [[ "${API_TOKEN_GITHUB}" =~ ^ghp_ ]]; then
   exit 1
 fi
 
-if ! [[ "${INPUT_DESTINATION_TARGET_BRANCH}" ]]; then
-  echo 'Missing target branch, usually "master" or "main".'
-  exit 1
-fi
-
-if ! [[ "${INPUT_DESTINATION_REPO}" ]]; then
+if ! [[ "${OBMONDO_DEPLOY_REPO_TARGET}" ]]; then
   echo 'Missing deployment repo.'
   exit 1
 fi
 
+deploy_repo_target="${OBMONDO_DEPLOY_REPO_TARGET}"
+deploy_repo_target_branch="${OBMONDO_DEPLOY_REPO_TARGET_BRANCH:-}"
+
 git config --global user.name "${INPUT_GIT_USER_NAME:-Obmondo}"
 git config --global user.email "${INPUT_GIT_USER_EMAIL:-info@obmondo.com}"
 
-target_branch=obmondo-deploy
+branch_name=obmondo-deploy
 # repo name without `.git`
-config_repo_name=$(basename "${INPUT_DESTINATION_REPO%%.git}")
+config_repo_name=$(basename "${deploy_repo_target%%.git}")
 config_repo_path="/tmp/${config_repo_name}"
 
 if ! [[ -d "${config_repo_path}" ]]; then
-  git clone "https://${API_TOKEN_GITHUB}@github.com/${INPUT_DESTINATION_REPO}.git" "${config_repo_path}"
+  git clone "https://${API_TOKEN_GITHUB}@github.com/${deploy_repo_target}.git" "${config_repo_path}"
 else
   git -C "${config_repo_path}" pull
 fi
 
 # shellcheck disable=SC2155
-declare -ri branch_exists=$(git show-ref -q "${target_branch}"; echo $?)
+declare -ri branch_exists=$(git -C "${config_repo_path}" show-ref -q "${branch_name}"; echo $?)
 
-git -C "${config_repo_path}" checkout -B "${target_branch}" --track "origin/master"
+declare -a git_checkout_args=()
+
+if [[ "${deploy_repo_target_branch}" ]];then
+   git_checkout_args+=('--track' "origin/${deploy_repo_target_branch}")
+fi
+
+git -C "${config_repo_path}" checkout -B "${branch_name}" "${git_checkout_args[@]}"
 
 # Loop over all clusters that are defined in config repo and copy
 # corresponding compiled files into cloned repo.
@@ -62,15 +66,15 @@ git -C "${config_repo_path}" push --force-with-lease origin HEAD
 # if the branch already exists we assume that the PR has already been created
 # too, and all we need to do is push, which we have done by now
 if (( branch_exists )); then
-  declare -a GH_PR_ARGS=()
+  declare -a gh_pr_args=()
 
-  if [ "${INPUT_PULL_REQUEST_REVIEWERS:-}" ]; then
-    GH_PR_ARGS+=('--reviewer' "${INPUT_PULL_REQUEST_REVIEWERS}")
+  if [ "${OBMONDO_DEPLOY_PULL_REQUEST_REVIEWERS:-}" ]; then
+    gh_pr_args+=('--reviewer' "${OBMONDO_DEPLOY_PULL_REQUEST_REVIEWERS}")
   fi
 
   cd "${config_repo_path}"
   gh pr create                                         \
      --title 'Updated Obmondo build'                   \
      --body 'Auto-generated pull request from Obmondo' \
-     "${GH_PR_ARGS[@]}"
+     "${gh_pr_args[@]}"
 fi
